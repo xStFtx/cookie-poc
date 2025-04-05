@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MGM Session Hijacking PoC</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #e74c3c;
+        }
+        .container {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border-left: 4px solid #2ecc71;
+            background-color: #f9f9f9;
+            display: none;
+        }
+        .warning {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        pre {
+            background-color: #f8f8f8;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>MGM Session Hijacking Proof of Concept</h1>
+    <div class="container">
+        <h2>Vulnerability Description</h2>
+        <p>This proof of concept demonstrates how exposed cookies from www.mgm.mo can be used to hijack user sessions and potentially access sensitive information.</p>
+        <p class="warning">Note: This tool is for educational and bug bounty reporting purposes only. Use only with your own test accounts or explicit permission.</p>
+    </div>
+
+    <div class="container">
+        <h2>Demonstration</h2>
+        <p>Click the button below to simulate inserting the exposed cookies into the browser and making an authenticated request to the MGM website.</p>
+        
+        <pre id="cookies">
+XSRF-TOKEN=eyJpdiI6InRLTSsycWt3XC9wVjVGYU5yb3F1RnhnPT0iLCJ2YWx1ZSI6IlhGaldwcXhvblQ4SW5sR3N1aHZNenNsb0pkXC82UGF3V3c3YTQ3Uk1IYU5qQUNsNHFGYUxrbnJXeW5kaG5Ncnd4IiwibWFjIjoiN2Y3NTczOWU3NzQyMzNkNmE4ZjIwN2Q1NWZlYjBkYTRjOGYyNTEwMThiODA5YjhhNDM4MjQ3NjZmYTBlMzIwOCJ9
+
+laravel_session=eyJpdiI6Iis2Y2VCRzJ1RjR0QTBxTkNXYjRNK2c9PSIsInZhbHVlIjoiSGNcL2p0dERWZDZyOUs0S2NWZzFYUHdRUHVvNTBzWEptRlJcL2NrZTVpZlY5QTNwc0VhaHVBa2tCdkRJKytnMlwvUCIsIm1hYyI6ImQzYTg3NmM4MmE1MmYzZTE4MmZmYjFiODIwY2MzOGUzZDUxNTJhNDdhZjVhYzRjZWFjZGQyNzQzZjk1YjNlMWUifQ%3D%3D
+
+SERVERID=3e49eb178bd6ef833d09ff6e595fccac|1743815474|1743815379
+        </pre>
+        
+        <button id="exploitBtn">Simulate Session Hijack</button>
+        
+        <div id="result">
+            <h3>Results:</h3>
+            <p id="resultText"></p>
+            <div id="userDataContainer"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>Technical Details</h2>
+        <p>The vulnerability exists because:</p>
+        <ol>
+            <li>The application exposes session cookies in HTTP responses</li>
+            <li>Laravel session cookies contain encrypted but valid session identifiers</li>
+            <li>XSRF tokens are exposed, allowing bypassing of CSRF protections</li>
+            <li>The application does not properly invalidate or expire these tokens</li>
+        </ol>
+        
+        <h3>Impact:</h3>
+        <p>An attacker with access to these cookies can:</p>
+        <ul>
+            <li>Impersonate legitimate users</li>
+            <li>Access personal information (PII)</li>
+            <li>Perform actions on behalf of users</li>
+            <li>Bypass security controls</li>
+        </ul>
+    </div>
+
+    <script>
+        document.getElementById('exploitBtn').addEventListener('click', function() {
+            // Simulate the exploitation process
+            const result = document.getElementById('result');
+            const resultText = document.getElementById('resultText');
+            const userDataContainer = document.getElementById('userDataContainer');
+            
+            result.style.display = 'block';
+            resultText.innerHTML = 'Simulating session hijacking...';
+            
+            // Simulate an API call with the stolen cookies
+            setTimeout(function() {
+                resultText.innerHTML = 'Session hijacked successfully! User data retrieved:';
+                
+                // Sample data that would be retrieved in a real exploit
+                const mockUserData = {
+                    name: "John Smith",
+                    email: "j***@example.com",
+                    membershipId: "MGM********345",
+                    membershipLevel: "Gold",
+                    pointsBalance: 12500,
+                    lastBooking: "2024-08-15",
+                    savedPaymentMethods: ["Visa ending in 4321", "MasterCard ending in 8765"],
+                    userPreferences: {
+                        roomPreference: "Non-smoking",
+                        communicationPreferences: "Email, SMS"
+                    }
+                };
+                
+                // Create a formatted display of the user data
+                const pre = document.createElement('pre');
+                pre.textContent = JSON.stringify(mockUserData, null, 2);
+                userDataContainer.innerHTML = '';
+                userDataContainer.appendChild(pre);
+                
+            }, 2000);
+        });
+    </script>
+</body>
+</html>
